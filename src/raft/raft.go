@@ -127,6 +127,7 @@ type Raft struct {
 	commitIndex  int
 	lastApplied  int
 
+	// leader 保存的吧
 	nextIndex   []int
 	matchIndx   []int
 
@@ -150,7 +151,7 @@ func (rf *Raft) beCandidate()  {
 	rf.state = Candidate
 	rf.currentTerm++
 	rf.votedFor = rf.me
-
+	// 持久化落盘
 	rf.persist()
 	args := RequestVoteArgs{
 		Term: rf.currentTerm,
@@ -171,7 +172,8 @@ func (rf *Raft) beLeader()  {
 	rf.state = Leader
 	rf.nextIndex = make([]int,len(rf.peers))
 	rf.matchIndx = make([]int, len(rf.peers))
-	for i := 0;i < len(rf.nextIndex);i++  {
+	// 都以leader为准
+	for i := 0; i < len(rf.nextIndex); i++ {
 		rf.nextIndex[i] = len(rf.log)
 	}
 }
@@ -187,7 +189,7 @@ func (rf *Raft) flush(behaviour int) {
 	//DPrintf("%d reset",rf.me)
 }
 
-//下面两个的调用者是每个服务器
+// 下面两个的调用者是每个节点
 func (rf *Raft ) getLastLogIdx() int{
 	return len(rf.log) - 1
 }
@@ -611,6 +613,7 @@ func (rf *Raft) ticker(){
 		//3-5 heart_eat 100ms
 		electionTimeout :=  rand.Intn(200) + 300
 
+		// 减少锁的持有时间
 		rf.mu.Lock()
 		state := rf.state
 		rf.mu.Unlock()
@@ -619,7 +622,7 @@ func (rf *Raft) ticker(){
 		case Follower, Candidate:
 			select {
 			case <- time.After(time.Duration(electionTimeout) * time.Millisecond):
-				//out of time,kick off election
+				// 超时 kick off election
 				rf.mu.Lock()
 				rf.beCandidate()
 				rf.mu.Unlock()
@@ -647,8 +650,9 @@ func (rf *Raft) ticker(){
 // if it's ever committed. the second return value is the current
 // term. the third return value is true if this server believes it is
 // the leader.
-//
-//start function is used to append new command to leader index是command应该开始出现的位置
+
+// start function is used to append new command to leader, index是command应该开始出现的位置
+// 返回值是 index, term, isleader
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -664,9 +668,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 			Command: command,
 		}
 		rf.log = append(rf.log,Entry)
-
+		// 持久化落盘
 		rf.persist()
-
+		// me代表当前节点在peers中的位置 每个节点保存一个peers数组
 		rf.matchIndx[rf.me] = rf.getLastLogIdx()//不能简单++ 因为append的command可能不止一个
 	}
 
