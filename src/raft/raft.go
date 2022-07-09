@@ -31,8 +31,11 @@ import "../labrpc"
 // import "bytes"
 import "../labgob"
 
+type nodeStata int
+
 const (
-	Follower = iota
+	// 从 0开始的常量
+	Follower nodeStata = iota
 	Candidate
 	Leader
 	ResetTimer
@@ -119,8 +122,8 @@ type Raft struct {
 	votedFor    int
 	log         []logEntries
 
-	state    int
-	flushCh  chan int
+	state    nodeStata
+	flushCh  chan nodeStata
 	majority int32
 
 	commitIndex int
@@ -175,7 +178,7 @@ func (rf *Raft) beLeader() {
 
 //case 1:receive AppendEntries RPC from current leader or granting vote to candidate,reset timer
 //case 2:step into leader and start heartbeat,jump out of select section in ticker() to flush leader state
-func (rf *Raft) flush(behaviour int) {
+func (rf *Raft) flush(behaviour nodeStata) {
 	/*select {
 	case <- rf.flushCh:
 	default:
@@ -706,7 +709,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.currentTerm = 0
 	rf.votedFor = -1
 	rf.state = Follower
-	rf.flushCh = make(chan int, 1)
+	rf.flushCh = make(chan nodeStata, 1)
 	rf.log = make([]logEntries, 1)
 	rf.applyCh = applyCh
 	rf.commitIndex = 0
