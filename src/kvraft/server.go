@@ -3,8 +3,8 @@ package kvraft
 import (
 	"../labgob"
 	"../labrpc"
-	"log"
 	"../raft"
+	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -35,11 +35,15 @@ type KVServer struct {
 	maxraftstate int // snapshot if log grows this big
 
 	// Your definitions here.
+	kvStore map[string]string	// kv存储
+	reqMap map[int]*OpContext	// log index -> 请求上下文
+	seqMap map[int64]int64 // 客户端id -> 客户端seq
 }
 
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
@@ -96,6 +100,9 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
 	// You may need initialization code here.
+	kv.kvStore = make(map[string]string)
+	kv.reqMap = make(map[int]*OpContext)
+	kv.seqMap = make(map[int64]int64)
 
 	return kv
 }
