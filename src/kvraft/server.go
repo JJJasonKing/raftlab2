@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const Debug = 0
@@ -23,6 +24,25 @@ type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	Index int // 写入raft log时的index
+	Term int // 写入raft log时的term
+	OpType string // PutAppend, Get
+	Key string
+	Value string
+	SeqId int64
+	ClientId int64
+}
+
+type OpContext struct {
+	op *Op
+
+	committed chan byte
+
+	wrongLeader bool 	// 因为index位置log的term不一致, 说明leader换过了
+	ignored bool // 因为req id过期, 导致该日志被跳过
+	// Get操作的结果
+	keyExist bool
+	value string
 }
 
 type KVServer struct {
@@ -48,6 +68,33 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
+	op := &Op{
+		OpType: args.Op,
+		Key: args.Key,
+		Value: args.Value,
+		ClientId: args.ClientId,
+		SeqId: args.SeqId,
+	}
+	// 写入raft层
+	var isLeader bool
+	op.Index, op.Term, isLeader = kv.rf.Start(op)
+	if !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
+	reply.Err = OK
+	opCtx := &OpContext{
+		op:          op,
+		committed:   make(chan byte),
+	}
+
+	timer := time.NewTimer(2000 * time.Millisecond)
+	defer timer.Stop()
+
+	select {
+	case <- opCtx.committed:
+	case <- timer.C:
+	}
 }
 
 //
