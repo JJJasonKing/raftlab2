@@ -80,7 +80,6 @@ func (ck *Clerk) Get(key string) string {
 		time.Sleep(1 * time.Millisecond)
 	}
 	// You will have to modify this function.
-	return ""
 }
 
 //
